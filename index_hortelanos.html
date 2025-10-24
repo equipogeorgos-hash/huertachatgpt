@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Foro de Hortelanos — Huerto Común</title>
+  <style>
+    :root{--accent:#2f8f44;--bg:#f6f8f6;--card:#ffffff}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);margin:0;color:#222}
+    header{background:linear-gradient(90deg, #eaf6ec, #ffffff);padding:18px 16px;border-bottom:1px solid #e0e6e0}
+    .container{max-width:900px;margin:18px auto;padding:0 16px}
+    h1{margin:0;font-size:22px;color:var(--accent)}
+    .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:12px}
+    form .row{display:flex;gap:8px;flex-wrap:wrap}
+    label{font-size:13px;color:#444}
+    input[type=text],input[type=email],textarea,select{width:100%;padding:8px;border:1px solid #d5ded5;border-radius:6px}
+    textarea{min-height:80px;resize:vertical}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid #d7e7d7}
+    .messages{display:flex;flex-direction:column;gap:10px}
+    .msg{border-left:4px solid var(--accent);padding:10px 12px;background:#fbfffb;border-radius:8px}
+    .meta{font-size:13px;color:#666;margin-bottom:6px}
+    .time{font-size:12px;color:#999}
+    .small{font-size:13px;color:#555}
+    .row-2{display:flex;gap:8px}
+    .flex{flex:1}
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+    .search{padding:8px;border-radius:8px;border:1px solid #e1eae1;flex:1}
+    footer{max-width:900px;margin:10px auto;padding:12px 16px;color:#666;font-size:13px}
+    @media(min-width:700px){form .two{flex:1}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Huerto Común — Foro de Hortelanos</h1>
+      <div class="small">Publica mensajes, comparte tu contacto y mantén un historial local para que otros puedan verlos.</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card" id="postForm">
+      <form id="form">
+        <div class="row">
+          <div style="flex:1">
+            <label for="name">Nombre (o apodo)</label>
+            <input id="name" type="text" placeholder="Ej. María, Hortelano123" required />
+          </div>
+          <div style="width:200px">
+            <label for="contact">Contacto (tel/email/WhatsApp)</label>
+            <input id="contact" type="text" placeholder="ej: 600-123-456 / mail@ej.com" />
+          </div>
+        </div>
+
+        <div style="margin-top:8px">
+          <label for="topic">Tema (opcional)</label>
+          <input id="topic" type="text" placeholder="Intercambio de semillas, ayuda, herramientas..." />
+        </div>
+
+        <div style="margin-top:8px">
+          <label for="message">Mensaje</label>
+          <textarea id="message" placeholder="Escribe aquí tu mensaje..." required></textarea>
+        </div>
+
+        <div class="controls" style="margin-top:8px">
+          <button type="submit">Publicar en el historial</button>
+          <button type="button" id="clearForm" class="ghost">Limpiar</button>
+          <button type="button" id="exportJson" class="ghost">Exportar/Guardar copia</button>
+          <button type="button" id="importJson" class="ghost">Importar copia</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <input class="search" id="search" placeholder="Buscar por nombre, tema o texto..." />
+        <select id="sort">
+          <option value="new">Más recientes</option>
+          <option value="old">Más antiguos</option>
+        </select>
+        <button id="clearAll" class="ghost">Borrar historial</button>
+        <div style="margin-left:auto;font-size:13px;color:#555">Mensajes guardados en tu navegador (local)</div>
+      </div>
+
+      <div id="messages" class="messages">
+        <!-- mensajes aparecerán aquí -->
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    Nota: Esta versión guarda los mensajes en el navegador (localStorage). Para que varias personas compartan el mismo historial desde diferentes equipos, instala esta página en un servidor o usa servicios como Netlify/GitHub Pages y añade un backend simple (opcional). Si quieres, puedo ayudarte a crear esa versión en línea.
+  </footer>
+
+  <input id="fileInput" type="file" accept="application/json" style="display:none" />
+
+  <script>
+    // Manejo básico de mensajes en localStorage
+    const STORAGE_KEY = 'huerto_historico_v1';
+
+    function nowIso(){ return new Date().toISOString(); }
+    function load(){
+      try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){return []}
+    }
+    function save(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+
+    function render(){
+      const container = document.getElementById('messages');
+      container.innerHTML='';
+      let msgs = load();
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      const sort = document.getElementById('sort').value;
+      if(q) msgs = msgs.filter(m => (m.name+m.contact+m.topic+m.text).toLowerCase().includes(q));
+      msgs.sort((a,b)=> sort==='new' ? (b.time.localeCompare(a.time)) : (a.time.localeCompare(b.time)));
+
+      if(msgs.length===0){ container.innerHTML='<div class="small">No hay mensajes todavía.</div>'; return }
+
+      msgs.forEach(m=>{
+        const el = document.createElement('div'); el.className='msg';
+        const meta = document.createElement('div'); meta.className='meta';
+        const t = new Date(m.time);
+        meta.innerHTML = `<strong>${escapeHtml(m.name||'Anónimo')}</strong> · <span class="time">${t.toLocaleString()}</span>` + (m.topic? ` · <em>${escapeHtml(m.topic)}</em>`:'');
+        const body = document.createElement('div'); body.innerHTML = `<div style="white-space:pre-wrap;margin:6px 0">${escapeHtml(m.text)}</div>`;
+        const contact = document.createElement('div'); contact.className='small'; contact.innerHTML = m.contact ? `Contacto: <a href="#" onclick="event.preventDefault();alert('Contacta a ${escapeHtml(m.name)}: ${escapeHtml(m.contact)}')">${escapeHtml(m.contact)}</a>` : '';
+        el.appendChild(meta); el.appendChild(body); if(contact.innerHTML) el.appendChild(contact);
+        container.appendChild(el);
+      });
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+
+    // Form handlers
+    document.getElementById('form').addEventListener('submit', e=>{
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim() || 'Anónimo';
+      const contact = document.getElementById('contact').value.trim();
+      const topic = document.getElementById('topic').value.trim();
+      const text = document.getElementById('message').value.trim();
+      if(!text) return alert('Escribe un mensaje antes de publicar.');
+      const arr = load();
+      arr.push({name,contact,topic,text,time:nowIso()});
+      save(arr);
+      document.getElementById('message').value='';
+      render();
+    });
+
+    document.getElementById('clearForm').addEventListener('click', ()=>{
+      document.getElementById('name').value='';
+      document.getElementById('contact').value='';
+      document.getElementById('topic').value='';
+      document.getElementById('message').value='';
+    });
+
+    document.getElementById('search').addEventListener('input', render);
+    document.getElementById('sort').addEventListener('change', render);
+
+    document.getElementById('clearAll').addEventListener('click', ()=>{
+      if(confirm('¿Borrar todo el historial de mensajes? Esta acción no se puede deshacer.')){
+        localStorage.removeItem(STORAGE_KEY); render();
+      }
+    });
+
+    // Export/import JSON
+    document.getElementById('exportJson').addEventListener('click', ()=>{
+      const data = JSON.stringify(load(),null,2);
+      const blob = new Blob([data],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download = 'huerto_historico.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('importJson').addEventListener('click', ()=>{
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return;
+      const rdr = new FileReader();
+      rdr.onload = ()=>{
+        try{
+          const parsed = JSON.parse(rdr.result);
+          if(!Array.isArray(parsed)) throw new Error('Formato inválido');
+          if(confirm('¿Añadir los mensajes importados al historial actual? Pulsa Aceptar para añadir, Cancelar para reemplazar.')){
+            const merged = load().concat(parsed);
+            save(merged);
+          }else{ save(parsed); }
+          render();
+          alert('Importación completada.');
+        }catch(err){ alert('Error al importar: ' + err.message) }
+      };
+      rdr.readAsText(f);
+      e.target.value='';
+    });
+
+    // Inicializar
+    render();
+  </script>
+</body>
+</html>
